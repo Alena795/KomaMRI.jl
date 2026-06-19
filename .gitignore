@@ -17,7 +17,6 @@ src/examples/sysimageSpinLab.dll
 *.gif
 !docs/src/assets/*.gif
 *.out
-*.txt
 *.nb
 qte_timings.txt
 *.nsys-rep
