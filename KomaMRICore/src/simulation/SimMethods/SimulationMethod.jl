@@ -11,6 +11,7 @@ const BlochLikeSimMethods = Union{Bloch, BlochMagnus1, BlochMagnus2, BlochMagnus
 include("Magnetization.jl")
 
 @functor Mag #Gives gpu acceleration capabilities, see GPUFunctions.jl
+@functor Mag2Pools
 
 function sim_output_dim(
     obj::Phantom, seq::Sequence, sys::Scanner, sim_method::SimulationMethod
