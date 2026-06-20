@@ -22,6 +22,15 @@ Base.getindex(M::Mag, i::Integer) = Mag(M.xy[i,:], M.z[i,:])
 Base.getindex(M::Mag, i) = Mag(M.xy[i], M.z[i])
 Base.view(M::Mag, i) = @views Mag(M.xy[i], M.z[i])
 
+mutable struct Mag2Pools{T<:Real} <: SpinStateRepresentation{T}
+    Ma::Mag{T}
+    Mb::Mag{T}
+end
+
+Base.getindex(M::Mag2Pools, i::Integer) = Mag2Pools(M.Ma[i], M.Mb[i])
+Base.getindex(M::Mag2Pools, i) = Mag2Pools(M.Ma[i], M.Mb[i])
+Base.view(M::Mag2Pools, i) = Mag2Pools(view(M.Ma, i), view(M.Mb, i))
+
 # Definition of rotation Spinor×SpinStateRepresentation
 @doc raw"""
 Spinor (\alpha, \beta) × Magnetization (Mx + i My, Mz)
