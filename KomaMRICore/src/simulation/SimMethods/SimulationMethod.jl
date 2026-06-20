@@ -37,6 +37,28 @@ function initialize_spins_state(
     return Xt, obj
 end
 
+"""Magnetization initialization for Bloch–McConnell 2-pool simulation method."""
+function initialize_spins_state(
+    obj::Phantom2Pools{T}, sim_method::BlochMcConnell2Pools
+) where {T<:Real}
+
+    Nspins = length(obj)
+
+    # Pool A initialization
+    Mxy_a = zeros(T, Nspins)
+    Mz_a  = obj.ρa
+    Ma = Mag{T}(Mxy_a, Mz_a)
+
+    # Pool B initialization
+    Mxy_b = zeros(T, Nspins)
+    Mz_b  = obj.ρb
+    Mb = Mag{T}(Mxy_b, Mz_b)
+
+    Xt = Mag2Pools{T}(Ma, Mb)
+
+    return Xt, obj
+end
+
 """Stores pre-allocated arrays for use in run_spin_precession! and run_spin_excitation!"""
 abstract type PreallocResult{T<:Real} end
 
