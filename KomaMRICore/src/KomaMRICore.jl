@@ -27,7 +27,7 @@ include("simulation/Flow.jl")
 # ISMRMRD
 export signal_to_raw_data
 # Simulator
-export Mag
+export Mag, Mag2Pools
 export simulate, simulate_slice_profile
 # Spinors
 export Spinor, Rx, Ry, Rz, Q, Un
