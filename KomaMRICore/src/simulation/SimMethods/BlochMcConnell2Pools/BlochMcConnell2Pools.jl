@@ -155,11 +155,7 @@ function run_spin_excitation!(
         # @show typeof(s.Δt)
         # @show s.Δt 
         # Relaxation + exchange
-        M_out = relax_exchange_operator(M, sim_method, seq.Δt[i], Ab, DC, D1, D2, D3, V)
-        M.Ma.xy .= M_out.Ma.xy
-        M.Ma.z  .= M_out.Ma.z
-        M.Mb.xy .= M_out.Mb.xy
-        M.Mb.z  .= M_out.Mb.z
+        relax_exchange_operator!(M, sim_method, seq.Δt[i], Ab, DC, D1, D2, D3, V)
         
         # Relaxation + exchange 
         # relax_exchange_operator!(M, sim_method, s.Δt, Ab, DC, D1, D2, D3, V)
@@ -298,63 +294,67 @@ function arrays_relax_exchange(p::Phantom2Pools{T}, sim_method::BlochMcConnell2P
 end
 
 
-function relax_exchange_operator(
+function relax_exchange_operator!(
     M::Mag2Pools{T},
     sim_method::BlochMcConnell2Pools,
     dt,
     Ab_all, DC_all, D1_all, D2_all, D3_all, V_all
 ) where {T<:Real}
     
-    # Change to (Mxa,Mya,Mza,Mxb,Myb,Mzb) formalism (M converted to shape 6*Nspins ) 
-    Mn = vcat(
-        reshape(real.(M.Ma.xy), 1, :),
-        reshape(imag.(M.Ma.xy), 1, :),
-        reshape(M.Ma.z,         1, :),
-        reshape(real.(M.Mb.xy), 1, :),
-        reshape(imag.(M.Mb.xy), 1, :),
-        reshape(M.Mb.z,         1, :)
-    )
+    @inbounds for i in eachindex(M.Ma.z)
 
-    Nspins = size(Mn, 2)
-    for i in 1:Nspins
+        Ab = @view Ab_all[:,1,i]
+        DC = @view DC_all[:,:,i]
+        V  = @view V_all[:,:,i]
 
-        Ab = Ab_all[:,1,i]
-        DC = DC_all[:,:,i]
-        D1 = D1_all[:,i]
-        D2 = D2_all[:,i]
-        D3 = D3_all[:,i]
-        V  = V_all[:,:,i]
+        e1 = exp(D1_all[1,i] * dt)
+        e2 = exp(D1_all[2,i] * dt)
+        e3 = exp(D2_all[1,i] * dt)
+        e4 = exp(D2_all[2,i] * dt)
+        e5 = exp(D3_all[1,i] * dt)
+        e6 = exp(D3_all[2,i] * dt)
 
-        col1=exp(D1[1]*dt) * V[:,1] 
-        col2=exp(D1[2]*dt) * V[:,4] 
-        col3=exp(D2[1]*dt) * V[:,2] 
-        col4=exp(D2[2]*dt) * V[:,5] 
-        col5=exp(D3[1]*dt) * V[:,3] 
-        col6=exp(D3[2]*dt) * V[:,6] 
+        x1 = real(M.Ma.xy[i]) + Ab[1]
+        x2 = imag(M.Ma.xy[i]) + Ab[2]
+        x3 = M.Ma.z[i]        + Ab[3]
 
-        D= [col1 col2 col3 col4 col5 col6]
+        x4 = real(M.Mb.xy[i]) + Ab[4]
+        x5 = imag(M.Mb.xy[i]) + Ab[5]
+        x6 = M.Mb.z[i]        + Ab[6]
 
-        # Applying the 6*6 operators 
-        Mn[:,i] .+= Ab
-        C = DC * Mn[:,i]
-        Mn[:,i] = D * C
-        Mn[:,i] .-= Ab
-    end 
+        c1 = DC[1,1]*x1 + DC[1,4]*x4
+        c2 = DC[2,1]*x1 + DC[2,4]*x4
 
-    # Back to Ma= (Mxya, Mza)/ Mb= (Mxyb, Mzb)  formalism 
-    Ma_new = Mag(
-        complex.(Mn[1, :], Mn[2, :]),
-        Mn[3, :]
-    )
+        c3 = DC[3,2]*x2 + DC[3,5]*x5
+        c4 = DC[4,2]*x2 + DC[4,5]*x5
 
-    Mb_new = Mag(
-        complex.(Mn[4, :], Mn[5, :]),
-        Mn[6, :]
-    )
-    # println("exiting the operator")
-    return Mag2Pools(Ma_new, Mb_new)
+        c5 = DC[5,3]*x3 + DC[5,6]*x6
+        c6 = DC[6,3]*x3 + DC[6,6]*x6
 
-end 
+        c1 *= e1
+        c2 *= e2
+        c3 *= e3
+        c4 *= e4
+        c5 *= e5
+        c6 *= e6
+
+        y1 = V[1,1]*c1 + V[1,4]*c2
+        y2 = V[2,2]*c3 + V[2,5]*c4
+        y3 = V[3,3]*c5 + V[3,6]*c6
+
+        y4 = V[4,1]*c1 + V[4,4]*c2
+        y5 = V[5,2]*c3 + V[5,5]*c4
+        y6 = V[6,3]*c5 + V[6,6]*c6
+
+        M.Ma.xy[i] = complex(y1 - Ab[1], y2 - Ab[2])
+        M.Ma.z[i]  = y3 - Ab[3]
+
+        M.Mb.xy[i] = complex(y4 - Ab[4], y5 - Ab[5])
+        M.Mb.z[i]  = y6 - Ab[6]
+    end
+
+    return nothing
+end
 
 
 function run_spin_precession!(
@@ -381,8 +381,8 @@ function run_spin_precession!(
     Bzb_new = prealloc.Bzb_new
     ϕa = prealloc.ϕa
     ϕb = prealloc.ϕb
-    Mxya = prealloc.M.Ma.xy
-    Mxyb = prealloc.M.Mb.xy
+    # Mxya = prealloc.M.Ma.xy
+    # Mxyb = prealloc.M.Mb.xy
     ΔBza = prealloc.ΔBza
     ΔBzb = prealloc.ΔBzb
     fill!(ϕa, zero(T))
@@ -407,6 +407,8 @@ function run_spin_precession!(
     V  = prealloc.V
     # Ab, DC, D1, D2, D3, V = arrays_relax_exchange(p, sim_method)
 
+    Mtmp = prealloc.M
+
     t_seq = zero(T) # Time
     for i in eachindex(seq.Δt)
         x, y, z = get_spin_coords(p.motion, p.x, p.y, p.z, seq.t[i + 1])
@@ -428,18 +430,22 @@ function run_spin_precession!(
         if seq.ADC[i + 1]
             # println("Entering adc condition")
             #Relaxation
-            M_out = relax_exchange_operator(M, sim_method, t_seq, Ab, DC, D1, D2, D3, V)
-            @. Mxya = M_out.Ma.xy * cis(ϕa)
-            @. Mxyb = M_out.Mb.xy * cis(ϕb)
-            
+            Mtmp.Ma.xy .= M.Ma.xy
+            Mtmp.Ma.z  .= M.Ma.z
+            Mtmp.Mb.xy .= M.Mb.xy
+            Mtmp.Mb.z  .= M.Mb.z
+            relax_exchange_operator!(Mtmp, sim_method, t_seq, Ab, DC, D1, D2, D3, V)
+            @. Mtmp.Ma.xy = Mtmp.Ma.xy * cis(ϕa)
+            @. Mtmp.Mb.xy = Mtmp.Mb.xy * cis(ϕb) # should even remove Mxya and Mxyb here, not needed
+
             #Reset Spin-State (Magnetization). Only for FlowPath
-            outflow_spin_reset!(Mxya, seq.t[i + 1], p.motion)
-            outflow_spin_reset!(Mxyb, seq.t[i + 1], p.motion)
+            outflow_spin_reset!(Mtmp.Ma.xy, seq.t[i + 1], p.motion)
+            outflow_spin_reset!(Mtmp.Mb.xy, seq.t[i + 1], p.motion)
             # @show maximum(abs.(M_out.Ma.z))
             # @show maximum(abs.(M_out.Mb.z))
-            # @show maximum(abs.(Mxya))
+            @show maximum(abs.(Mtmp.Ma.xy))
             # @show maximum(abs.(Mxyb))
-            sig[ADC_idx] = sum(Mxya + Mxyb) 
+            sig[ADC_idx] = sum(Mtmp.Ma.xy + Mtmp.Mb.xy) 
             ADC_idx += 1
             # println("Exiting adc condition")
         end
@@ -449,12 +455,10 @@ function run_spin_precession!(
     end
 
     #Final Spin-State
-    M_out = relax_exchange_operator(M, sim_method, t_seq, Ab, DC, D1, D2, D3, V)
-    @. M.Ma.xy = M_out.Ma.xy * cis(ϕa)
-    @. M.Mb.xy = M_out.Mb.xy * cis(ϕb)
-    M.Ma.z  .= M_out.Ma.z
-    M.Mb.z  .= M_out.Mb.z
-    
+    relax_exchange_operator!(M, sim_method, t_seq, Ab, DC, D1, D2, D3, V)
+    @. M.Ma.xy = M.Ma.xy * cis(ϕa)
+    @. M.Mb.xy = M.Mb.xy * cis(ϕb)
+ 
     #Reset Spin-State (Magnetization). Only for FlowPath
     outflow_spin_reset!(M.Ma,  seq.t', p.motion; replace_by=p.ρa)
     outflow_spin_reset!(M.Mb,  seq.t', p.motion; replace_by=p.ρb)
