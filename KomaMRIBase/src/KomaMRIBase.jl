@@ -82,7 +82,7 @@ include("timing/TrapezoidalIntegration.jl")
 
 # Main
 export γ    # gyro-magnetic ratio [Hz/T]
-export Scanner, Sequence, Phantom
+export Scanner, Sequence, Phantom, Phantom2Pools, AbstractPhantom
 export addblock!, @addblock, @addblocks
 export Grad, RF, ADC, Delay, Duration, QuaternionRot
 export dur, get_block_start_times, get_samples
