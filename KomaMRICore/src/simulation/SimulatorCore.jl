@@ -61,7 +61,7 @@ function default_sim_params(sim_params=Dict{String,Any}())
 end
 
 function run_spin_precession_parallel!(
-    obj::Phantom{T},
+    obj::AbstractPhantom{T},
     seq::DiscreteSequence{T},
     sig::AbstractArray{Complex{T}},
     Xt::SpinStateRepresentation{T},
@@ -83,7 +83,7 @@ function run_spin_precession_parallel!(
 end
 
 function run_spin_excitation_parallel!(
-    obj::Phantom{T},
+    obj::AbstractPhantom{T},
     seq::DiscreteSequence{T},
     sig::AbstractArray{Complex{T}},
     Xt::SpinStateRepresentation{T},
@@ -130,7 +130,7 @@ take advantage of CPU parallel processing.
 - `M0`: (`::Vector{Mag}`) final state of the Mag vector
 """
 function run_sim_time_iter!(
-    obj::Phantom,
+    obj::AbstractPhantom,
     seqd::DiscreteSequence,
     sig::AbstractArray{Complex{T}},
     Xt::SpinStateRepresentation{T},
@@ -316,7 +316,7 @@ julia> plot_signal(raw)
 ```
 """
 function simulate(
-    obj::Phantom, seq::Sequence, sys::Scanner; sim_params=Dict{String,Any}(), verbose=true, callbacks=()
+    obj::AbstractPhantom, seq::Sequence, sys::Scanner; sim_params=Dict{String,Any}(), verbose=true, callbacks=()
 )
     _assert_nonnegative_adc_labels(seq)
     #Simulation parameter unpacking, and setting defaults if key is not defined
