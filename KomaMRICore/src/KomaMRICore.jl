@@ -8,6 +8,7 @@ using Reexport
 using ThreadsX
 # Printing
 using ProgressMeter
+using LinearAlgebra
 
 # KomaMRIBase
 @reexport using KomaMRIBase

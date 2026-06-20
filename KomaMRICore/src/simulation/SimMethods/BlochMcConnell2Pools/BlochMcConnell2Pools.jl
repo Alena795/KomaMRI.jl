@@ -444,6 +444,7 @@ function run_spin_precession!(
             # @show maximum(abs.(M_out.Ma.z))
             # @show maximum(abs.(M_out.Mb.z))
             @show maximum(abs.(Mtmp.Ma.xy))
+            @show maximum(abs.(Mtmp.Mb.xy))
             # @show maximum(abs.(Mxyb))
             sig[ADC_idx] = sum(Mtmp.Ma.xy + Mtmp.Mb.xy) 
             ADC_idx += 1
