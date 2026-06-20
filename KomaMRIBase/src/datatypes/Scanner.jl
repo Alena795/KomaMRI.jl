@@ -32,7 +32,7 @@ julia> sys.B0
     #Main
     B0::Float64 = 1.5
     B1::Float64 = 10e-6
-    Gmax::Float64 = 60e-3
+    Gmax::Float64 = 204e-3
     Smax::Float64 = 500.0
     #Sampling
     ADC_Δt::Float64 = 2e-6
