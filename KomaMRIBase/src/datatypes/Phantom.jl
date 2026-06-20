@@ -1,3 +1,5 @@
+abstract type AbstractPhantom{T<:Real} end
+
 """
     obj = Phantom(name, x, y, z, ρ, T1, T2, T2s, Δw, Dλ1, Dλ2, Dθ, motion)
 
@@ -29,7 +31,7 @@ julia> obj = Phantom(x=[0.0])
 julia> obj.ρ
 ```
 """
-@with_kw mutable struct Phantom{T<:Real}
+@with_kw mutable struct Phantom{T<:Real} <: AbstractPhantom{T}
     name::String           = "spins"
     x::AbstractVector{T}   = @isdefined(T) ? T[] : Float64[]
     y::AbstractVector{T}   = zeros(eltype(x), size(x))
@@ -120,6 +122,110 @@ function get_dims(obj::Phantom)
     push!(dims, any(x -> x != 0, obj.z))
     return sum(dims) > 0 ? dims : Bool[1, 0, 0]
 end
+
+@with_kw mutable struct Phantom2Pools{T<:Real} <: AbstractPhantom{T}
+    name::String           = "spins"
+    x::AbstractVector{T}   = @isdefined(T) ? T[] : Float64[]
+    y::AbstractVector{T}   = zeros(eltype(x), size(x))
+    z::AbstractVector{T}   = zeros(eltype(x), size(x))
+    ρa::AbstractVector{T}   = ones(eltype(x), size(x))
+    ρb::AbstractVector{T}   = ones(eltype(x), size(x))
+    T1a::AbstractVector{T}  = ones(eltype(x), size(x)) * 1_000_000
+    T2a::AbstractVector{T}  = ones(eltype(x), size(x)) * 1_000_000
+    T2sa::AbstractVector{T} = ones(eltype(x), size(x)) * 1_000_000
+    T1b::AbstractVector{T}  = ones(eltype(x), size(x)) * 1_000_000
+    T2b::AbstractVector{T}  = ones(eltype(x), size(x)) * 1_000_000
+    T2sb::AbstractVector{T} = ones(eltype(x), size(x)) * 1_000_000
+    #Off-resonance related
+    Δwa::AbstractVector{T} = zeros(eltype(x), size(x))
+    Δwb::AbstractVector{T} = zeros(eltype(x), size(x))
+    #Exchange rates
+    kab::AbstractVector{T} = zeros(eltype(x), size(x))
+    kba::AbstractVector{T} = zeros(eltype(x), size(x))
+    #χ::Vector{SusceptibilityModel}
+    #Diffusion
+    Dλ1::AbstractVector{T} = zeros(eltype(x), size(x))
+    Dλ2::AbstractVector{T} = zeros(eltype(x), size(x))
+    Dθ::AbstractVector{T}  = zeros(eltype(x), size(x))
+    #Diff::Vector{DiffusionModel}  #Diffusion map
+    #Motion
+    motion::Union{NoMotion, Motion{T}, MotionList{T}} = NoMotion()
+end
+
+const NON_STRING_PHANTOM2POOLS_FIELDS = Iterators.filter(x -> fieldtype(Phantom2Pools, x) != String,         fieldnames(Phantom2Pools))
+const VECTOR_PHANTOM2POOLS_FIELDS     = Iterators.filter(x -> fieldtype(Phantom2Pools, x) <: AbstractVector, fieldnames(Phantom2Pools))
+
+"""Size and length of a phantom2Pools"""
+size(x::Phantom2Pools) = size(x.ρa)
+Base.length(x::Phantom2Pools) = length(x.ρa)
+
+# To enable to iterate and broadcast over the Phantom
+Base.iterate(x::Phantom2Pools) = (x[1], 2)
+Base.iterate(x::Phantom2Pools, i::Integer) = (i <= length(x)) ? (x[i], i + 1) : nothing
+Base.lastindex(x::Phantom2Pools) = length(x)
+Base.getindex(x::Phantom2Pools, i::Integer) = x[i:i]
+Base.view(x::Phantom2Pools, i::Integer) = @view(x[i:i])
+Base.copy(obj::Phantom2Pools) = Phantom2Pools(_deepcopy_fields(obj)...)
+
+"""Compare two Phantom2Pools"""
+function Base.:(==)(obj1::Phantom2Pools, obj2::Phantom2Pools)
+    if length(obj1) != length(obj2) return false end
+    return reduce(&, [getfield(obj1, field) == getfield(obj2, field) for field in NON_STRING_PHANTOM2POOLS_FIELDS])
+end
+function Base.:(≈)(obj1::Phantom2Pools, obj2::Phantom2Pools)
+    if length(obj1) != length(obj2) return false end
+    return reduce(&, [getfield(obj1, field)  ≈ getfield(obj2, field) for field in NON_STRING_PHANTOM2POOLS_FIELDS])
+end
+# Comparison between two different motion types is always false:
+Base.:(==)(::Union{NoMotion, Motion, MotionList}, ::Union{NoMotion, Motion, MotionList}) = false
+Base.:(≈)(::Union{NoMotion, Motion, MotionList},  ::Union{NoMotion, Motion, MotionList}) = false
+
+"""Separate object spins in a sub-group"""
+function Base.getindex(obj::Phantom2Pools, p)
+    fields = []
+    for field in NON_STRING_PHANTOM2POOLS_FIELDS
+        push!(fields, (field, getfield(obj, field)[p]))
+    end
+    return Phantom2Pools(; name=obj.name, fields...)
+end
+function Base.view(obj::Phantom2Pools, p)
+    fields = []
+    for field in NON_STRING_PHANTOM2POOLS_FIELDS
+        push!(fields, (field, @view(getfield(obj, field)[p])))
+    end
+    return Phantom2Pools(; name=obj.name, fields...)
+end
+
+"""Addition of phantoms"""
++(obj1::Phantom2Pools, obj2::Phantom2Pools) = begin
+    name = first(obj1.name * "+" * obj2.name, 50) # The name is limited to 50 characters
+    fields = []
+    for field in VECTOR_PHANTOM2POOLS_FIELDS
+        push!(fields, (field, [getfield(obj1, field); getfield(obj2, field)]))
+    end
+    return Phantom2Pools(; 
+        name = name, 
+        fields..., 
+        motion = vcat(obj1.motion, obj2.motion, length(obj1), length(obj2)))
+end
+
+"""Scalar multiplication of a phantom"""
+*(α::Real, obj::Phantom2Pools) = begin
+    obj1 = deepcopy(obj)
+    obj1.ρa .*= α
+    obj1.ρb .*= α
+    return obj1
+end
+
+"""dims = get_dims(obj)"""
+function get_dims(obj::Phantom2Pools)
+    dims = Bool[]
+    push!(dims, any(x -> x != 0, obj.x))
+    push!(dims, any(x -> x != 0, obj.y))
+    push!(dims, any(x -> x != 0, obj.z))
+    return sum(dims) > 0 ? dims : Bool[1, 0, 0]
+end
+
 
 """
     obj = heart_phantom(
