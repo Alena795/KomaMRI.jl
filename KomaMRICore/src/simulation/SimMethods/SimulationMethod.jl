@@ -17,7 +17,7 @@ include("Magnetization.jl")
 @functor Mag2Pools
 
 function sim_output_dim(
-    obj::Phantom, seq::Sequence, sys::Scanner, sim_method::SimulationMethod
+    obj::AbstractPhantom, seq::Sequence, sys::Scanner, sim_method::SimulationMethod
 )
     return (sum(seq.ADC.N), 1) #Nt x Ncoils, This should consider the coil info from sys
 end
