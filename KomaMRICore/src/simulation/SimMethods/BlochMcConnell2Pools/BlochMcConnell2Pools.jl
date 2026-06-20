@@ -443,8 +443,8 @@ function run_spin_precession!(
             outflow_spin_reset!(Mtmp.Mb.xy, seq.t[i + 1], p.motion)
             # @show maximum(abs.(M_out.Ma.z))
             # @show maximum(abs.(M_out.Mb.z))
-            @show maximum(abs.(Mtmp.Ma.xy))
-            @show maximum(abs.(Mtmp.Mb.xy))
+            # @show maximum(abs.(Mtmp.Ma.xy))
+            # @show maximum(abs.(Mtmp.Mb.xy))
             # @show maximum(abs.(Mxyb))
             sig[ADC_idx] = sum(Mtmp.Ma.xy + Mtmp.Mb.xy) 
             ADC_idx += 1
