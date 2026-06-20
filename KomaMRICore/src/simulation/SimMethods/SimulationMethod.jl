@@ -8,6 +8,9 @@ struct BlochMagnus4 <: BlochMagnus end
 export BlochMagnus1, BlochMagnus2, BlochMagnus4
 const BlochLikeSimMethods = Union{Bloch, BlochMagnus1, BlochMagnus2, BlochMagnus4}
 
+struct BlochMcConnell2Pools <: SimulationMethod end
+export BlochMcConnell2Pools
+
 include("Magnetization.jl")
 
 @functor Mag #Gives gpu acceleration capabilities, see GPUFunctions.jl
