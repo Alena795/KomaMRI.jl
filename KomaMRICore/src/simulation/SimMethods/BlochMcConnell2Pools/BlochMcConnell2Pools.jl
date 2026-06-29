@@ -10,7 +10,6 @@ struct BlochMcConnell2PoolsPrealloc{T} <: PreallocResult{T}
     Rot::Spinor{T}
     ΔBza::AbstractVector{T}
     ΔBzb::AbstractVector{T}
-    Ab
     DC
     D1
     D2
@@ -30,7 +29,6 @@ Base.view(p::BlochMcConnell2PoolsPrealloc, i::UnitRange) = begin
         p.Rot[i],
         p.ΔBza[i],
         p.ΔBzb[i],
-        p.Ab[:, :, i],
         p.DC[:, :, i],
         p.D1[:, i],
         p.D2[:, i],
@@ -51,7 +49,7 @@ function prealloc(
     groupsize
 ) where {T<:Real}
     
-    Ab, DC, D1, D2, D3, V = arrays_relax_exchange(obj, sim_method)
+    DC, D1, D2, D3, V = arrays_relax_exchange(obj, sim_method)
     
     return BlochMcConnell2PoolsPrealloc(
         Mag2Pools(
@@ -73,7 +71,6 @@ function prealloc(
 
         obj.Δwa ./ T(2π * γ),
         obj.Δwb ./ T(2π * γ),
-        Ab,
         DC,
         D1,
         D2,
@@ -113,7 +110,7 @@ function run_spin_excitation!(
     ΔBzb = prealloc.ΔBzb
     
     # Precomputing static arrays required for constructing the relax-exchange operator 
-    Ab = prealloc.Ab
+    # Ab = prealloc.Ab
     DC = prealloc.DC
     D1 = prealloc.D1
     D2 = prealloc.D2
@@ -155,7 +152,7 @@ function run_spin_excitation!(
         # @show typeof(s.Δt)
         # @show s.Δt 
         # Relaxation + exchange
-        relax_exchange_operator!(M, sim_method, seq.Δt[i], Ab, DC, D1, D2, D3, V)
+        relax_exchange_operator!(M, sim_method, seq.Δt[i], DC, D1, D2, D3, V)
         
         # Relaxation + exchange 
         # relax_exchange_operator!(M, sim_method, s.Δt, Ab, DC, D1, D2, D3, V)
@@ -178,7 +175,7 @@ function arrays_relax_exchange(p::Phantom2Pools{T}, sim_method::BlochMcConnell2P
     Nspins = length(p)
 
     # Tensors containing arrays at each spin position
-    Ab_all    = zeros(6, 1, Nspins)
+    # Ab_all    = zeros(6, 1, Nspins)
     DC_all    = zeros(6, 6, Nspins)
     D1_all    = zeros(2, Nspins)
     D2_all    = zeros(2, Nspins)
@@ -189,10 +186,10 @@ function arrays_relax_exchange(p::Phantom2Pools{T}, sim_method::BlochMcConnell2P
     
         # Construction of matrix A and vector b
         A = zeros(6,6) 
-        b = zeros(6,1)
+        # b = zeros(6,1)
 
-        b[3] = p.ρa[i] / p.T1a[i] 
-        b[6] = p.ρb[i] / p.T1b[i] 
+        # b[3] = p.ρa[i] / p.T1a[i] 
+        # b[6] = p.ρb[i] / p.T1b[i] 
 
         # Diagonal terms 
         A[1,1] = -1/p.T2a[i] - p.kab[i]
@@ -211,13 +208,13 @@ function arrays_relax_exchange(p::Phantom2Pools{T}, sim_method::BlochMcConnell2P
         A[3,6] = p.kba[i]
 
         # Computing A^(-1)*b 
-        if det(A) == 0
-            println("A not invertible, no relaxation and no coupling is assumed")
-            Ab = zeros(6,1)
-            println("Ab = ", Ab)
-        else
-            Ab = A \ b
-        end
+        # if det(A) == 0
+        #     println("A not invertible, no relaxation and no coupling is assumed")
+        #     Ab = zeros(6,1)
+        #     println("Ab = ", Ab)
+        # else
+        #     Ab = A \ b
+        # end
 
         # Blocks of A in the basis where A is block-diagonal : At1, At2 = At1, At3
         A_t1 = A[[1,4],[1,4]]
@@ -282,15 +279,15 @@ function arrays_relax_exchange(p::Phantom2Pools{T}, sim_method::BlochMcConnell2P
         #     println("$name: type=$(typeof(x)), size=$(size(x))")
         # end
 
-        Ab_all[:,:,i] .= Ab
+        # Ab_all[:,:,i] .= Ab
         DC_all[:,:,i] .= DC
         D1_all[:,i] .= D1
         D2_all[:,i] .= D2
         D3_all[:,i] .= D3
         V_all[:,:,i] .= V
     end  
-
-    return Ab_all, DC_all, D1_all, D2_all, D3_all, V_all
+    #return Ab_all, DC_all, D1_all, D2_all, D3_all, V_all
+    return DC_all, D1_all, D2_all, D3_all, V_all
 end
 
 
@@ -298,12 +295,12 @@ function relax_exchange_operator!(
     M::Mag2Pools{T},
     sim_method::BlochMcConnell2Pools,
     dt,
-    Ab_all, DC_all, D1_all, D2_all, D3_all, V_all
+    DC_all, D1_all, D2_all, D3_all, V_all
 ) where {T<:Real}
     
     @inbounds for i in eachindex(M.Ma.z)
 
-        Ab = @view Ab_all[:,1,i]
+        # Ab = @view Ab_all[:,1,i]
         DC = @view DC_all[:,:,i]
         V  = @view V_all[:,:,i]
 
@@ -314,13 +311,21 @@ function relax_exchange_operator!(
         e5 = exp(D3_all[1,i] * dt)
         e6 = exp(D3_all[2,i] * dt)
 
-        x1 = real(M.Ma.xy[i]) + Ab[1]
-        x2 = imag(M.Ma.xy[i]) + Ab[2]
-        x3 = M.Ma.z[i]        + Ab[3]
+        # x1 = real(M.Ma.xy[i]) + Ab[1]
+        # x2 = imag(M.Ma.xy[i]) + Ab[2]
+        # x3 = M.Ma.z[i]        + Ab[3]
 
-        x4 = real(M.Mb.xy[i]) + Ab[4]
-        x5 = imag(M.Mb.xy[i]) + Ab[5]
-        x6 = M.Mb.z[i]        + Ab[6]
+        # x4 = real(M.Mb.xy[i]) + Ab[4]
+        # x5 = imag(M.Mb.xy[i]) + Ab[5]
+        # x6 = M.Mb.z[i]        + Ab[6]
+
+        x1 = real(M.Ma.xy[i]) 
+        x2 = imag(M.Ma.xy[i]) 
+        x3 = M.Ma.z[i]        
+
+        x4 = real(M.Mb.xy[i]) 
+        x5 = imag(M.Mb.xy[i]) 
+        x6 = M.Mb.z[i]        
 
         c1 = DC[1,1]*x1 + DC[1,4]*x4
         c2 = DC[2,1]*x1 + DC[2,4]*x4
@@ -346,11 +351,15 @@ function relax_exchange_operator!(
         y5 = V[5,2]*c3 + V[5,5]*c4
         y6 = V[6,3]*c5 + V[6,6]*c6
 
-        M.Ma.xy[i] = complex(y1 - Ab[1], y2 - Ab[2])
-        M.Ma.z[i]  = y3 - Ab[3]
+        # M.Ma.xy[i] = complex(y1 - Ab[1], y2 - Ab[2])
+        # M.Ma.z[i]  = y3 - Ab[3]
+        M.Ma.xy[i] = complex(y1,y2)
+        M.Ma.z[i]  = y3 
 
-        M.Mb.xy[i] = complex(y4 - Ab[4], y5 - Ab[5])
-        M.Mb.z[i]  = y6 - Ab[6]
+        # M.Mb.xy[i] = complex(y4 - Ab[4], y5 - Ab[5])
+        # M.Mb.z[i]  = y6 - Ab[6]
+        M.Mb.xy[i] = complex(y4, y5)
+        M.Mb.z[i]  = y6 
     end
 
     return nothing
@@ -399,7 +408,7 @@ function run_spin_precession!(
     # end
 
     # Precomputing static arrays required for constructing the relax-exchange operator 
-    Ab = prealloc.Ab
+    # Ab = prealloc.Ab
     DC = prealloc.DC
     D1 = prealloc.D1
     D2 = prealloc.D2
@@ -434,7 +443,7 @@ function run_spin_precession!(
             Mtmp.Ma.z  .= M.Ma.z
             Mtmp.Mb.xy .= M.Mb.xy
             Mtmp.Mb.z  .= M.Mb.z
-            relax_exchange_operator!(Mtmp, sim_method, t_seq, Ab, DC, D1, D2, D3, V)
+            relax_exchange_operator!(Mtmp, sim_method, t_seq, DC, D1, D2, D3, V)
             @. Mtmp.Ma.xy = Mtmp.Ma.xy * cis(ϕa)
             @. Mtmp.Mb.xy = Mtmp.Mb.xy * cis(ϕb) # should even remove Mxya and Mxyb here, not needed
 
@@ -456,7 +465,7 @@ function run_spin_precession!(
     end
 
     #Final Spin-State
-    relax_exchange_operator!(M, sim_method, t_seq, Ab, DC, D1, D2, D3, V)
+    relax_exchange_operator!(M, sim_method, t_seq, DC, D1, D2, D3, V)
     @. M.Ma.xy = M.Ma.xy * cis(ϕa)
     @. M.Mb.xy = M.Mb.xy * cis(ϕb)
  
